@@ -28,5 +28,9 @@ func DecodeAtomFmt1(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func (pkt AtomFmt1ETMv4) String() string {
-	return fmt.Sprintf("Atom Format 1 Branch Taken %t", pkt.taken)
+	taken := "Taken"
+	if pkt.taken == false {
+		taken = "Not Taken"
+	}
+	return fmt.Sprintf("Atom Format 1 Branch %s", taken)
 }

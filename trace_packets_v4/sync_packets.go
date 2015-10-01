@@ -141,10 +141,12 @@ func DecodeTraceOn(header byte, reader *bufio.Reader) TracePacket {
 func DecodeTimestamp(header byte, reader *bufio.Reader) TracePacket {
 	pkt := TimestampETMv4{}
 
-	pkt.cycle_count_valid = (header&0x1 == 1)
+	if header&0x1 == 1 {
+		pkt.cycle_count_valid = true
+	}
 
 	ts_pos := 0
-	for ; ts_pos < 9; ts_pos++ {
+	for ; ts_pos < 8; ts_pos++ {
 		ts_byte, err := reader.ReadByte()
 
 		if err != nil {
@@ -152,13 +154,13 @@ func DecodeTimestamp(header byte, reader *bufio.Reader) TracePacket {
 			return nil
 		}
 
-		pkt.timestamp |= uint64(ts_byte & 0x7f << uint(ts_pos*7))
+		pkt.timestamp |= uint64(ts_byte&0x7f) << uint(ts_pos*7)
 		if ts_byte&0x80 == 0 {
 			break
 		}
 	}
 	// Full TS packet, copy last byte
-	if ts_pos == 9 {
+	if ts_pos == 8 {
 		ts_byte, err := reader.ReadByte()
 
 		if err != nil {
@@ -171,9 +173,11 @@ func DecodeTimestamp(header byte, reader *bufio.Reader) TracePacket {
 
 	if pkt.cycle_count_valid {
 		count_pos := 0
+		var count_byte byte
+		var err error
 
 		for ; count_pos < 2; count_pos++ {
-			count_byte, err := reader.ReadByte()
+			count_byte, err = reader.ReadByte()
 
 			if err != nil {
 				log.Println("Error reading Timestamp byte.")
@@ -181,11 +185,15 @@ func DecodeTimestamp(header byte, reader *bufio.Reader) TracePacket {
 			}
 
 			pkt.cycle_count |= uint32(count_byte & 0x7f << uint(count_pos*7))
+
+			if count_byte&0x80 == 0 {
+				break
+			}
 		}
 
 		// Copy last [19:14]
-		if count_pos == 2 {
-			count_byte, err := reader.ReadByte()
+		if count_pos == 2 && count_byte&0x80 == 0x80 {
+			count_byte, err = reader.ReadByte()
 
 			if err != nil {
 				log.Println("Error reading Timestamp byte.")
@@ -212,7 +220,7 @@ func (pkt TimestampETMv4) String() string {
 	buffer.WriteString(fmt.Sprintf("Timestamp: 0x%x", pkt.timestamp))
 
 	if pkt.cycle_count_valid {
-		buffer.WriteString(fmt.Sprintf("Cycle Count: 0x%x", pkt.cycle_count))
+		buffer.WriteString(fmt.Sprintf(" Cycle Count: 0x%x", pkt.cycle_count))
 	}
 
 	return buffer.String()

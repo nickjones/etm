@@ -75,10 +75,10 @@ var etypes = [...]string{
 	"Reserved",
 	"IRQ",
 	"FIQ",
-	"Implementation Defined 0 - spr_resync",
-	"Implementation Defined 1 - dla_intercept",
-	"Implementation Defined 2 - dec_mon_trp_rpr",
-	"Implementation Defined 3 - excpt_intrcpt",
+	"Implementation Defined 0",
+	"Implementation Defined 1",
+	"Implementation Defined 2",
+	"Implementation Defined 3",
 	"Implementation Defined 4",
 	"Implementation Defined 5",
 	"Implementation Defined 6",
@@ -123,8 +123,10 @@ func DecodeException(header byte, reader *bufio.Reader) TracePacket {
 	addr_header, err := reader.ReadByte()
 
 	switch addr_header {
-	case 0x9d:
-		pkt.return_addr = DecodeLong64bIS0(header, reader)
+	case 0x9a, 0x9b:
+		pkt.return_addr = DecodeLong32b(addr_header, reader)
+	case 0x9d, 0x9e:
+		pkt.return_addr = DecodeLong64b(addr_header, reader)
 	default:
 		pkt.return_addr = nil
 		log.Println("Error decoding header for preferred return address after exception.")
