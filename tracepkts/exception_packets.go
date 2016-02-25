@@ -1,4 +1,4 @@
-package etmv4_trace_packets
+package tracepkts
 
 import (
 	"bufio"
