@@ -168,7 +168,7 @@ func DecodeTimestamp(header byte, reader *bufio.Reader) TracePacket {
 			return nil
 		}
 
-		pkt.timestamp |= uint64(ts_byte << 56)
+		pkt.timestamp |= uint64(ts_byte) << 56
 	}
 
 	if pkt.cycle_count_valid {
@@ -200,7 +200,7 @@ func DecodeTimestamp(header byte, reader *bufio.Reader) TracePacket {
 				return nil
 			}
 
-			pkt.cycle_count |= uint32(count_byte & 0x3f << 14)
+			pkt.cycle_count |= uint32(count_byte&0x3f) << 14
 		}
 	}
 	return pkt
