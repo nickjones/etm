@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	etf "github.com/nickjones/etm/etf"
 	pkts "github.com/nickjones/etm/tracepkts"
 )
@@ -122,6 +122,8 @@ func main() {
 	}
 	input := bufio.NewReader(file)
 
+	var addr_stack []uint64
+
 	for {
 		header, err := input.ReadByte()
 		if err == io.EOF {
@@ -132,7 +134,22 @@ func main() {
 		}
 		pkt := pkts.DecodePacket(header, input)
 		if pkt != nil {
-			fmt.Println(pkt.String())
+			switch pkt.(type) {
+			default:
+				fmt.Println(pkt.String())
+			case pkts.Long64bAddrETMv4:
+				addr_pkt := pkt.(pkts.Long64bAddrETMv4)
+				addr_stack = append(addr_stack, addr_pkt.Address())
+				fmt.Println(pkt.String())
+			case pkts.CompressedAddrETMv4:
+				addr_pkt := pkt.(pkts.CompressedAddrETMv4)
+				addr := uint64(0)
+				if len(addr_stack) > 0 {
+					addr = addr_stack[0]
+				}
+				fmt.Printf("Address: 0x%016x\n", addr_pkt.AddrWithBase(addr))
+				// fmt.Println(addr_pkt.StringWithBase(addr))
+			}
 		} else {
 			log.Printf("WARN: Dropped byte 0x%x\n", header)
 		}

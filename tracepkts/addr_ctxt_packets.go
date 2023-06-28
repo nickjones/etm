@@ -11,12 +11,14 @@ type Long64bAddrETMv4 struct {
 	*GenericTracePacketv4
 	is      int8
 	address uint64
+	width   uint64
 }
 
 type CompressedAddrETMv4 struct {
 	*GenericTracePacketv4
 	is     int8
 	offset uint64
+	width  uint64
 }
 
 const (
@@ -59,7 +61,7 @@ func DecodeExactAddr(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func DecodeShortAddr(header byte, reader *bufio.Reader) TracePacket {
-	pkt := CompressedAddrETMv4{}
+	pkt := CompressedAddrETMv4{ width: 8}
 
 	if header == 0x95 {
 		pkt.is = 0
@@ -87,13 +89,14 @@ func DecodeShortAddr(header byte, reader *bufio.Reader) TracePacket {
 			addr_int &= 0x7f
 		}
 		pkt.offset |= addr_int << uint(9-pkt.is)
+		pkt.width = 16
 	}
 
 	return pkt
 }
 
 func DecodeLong32b(header byte, reader *bufio.Reader) TracePacket {
-	pkt := CompressedAddrETMv4{}
+	pkt := CompressedAddrETMv4{ width: 32}
 
 	if header == 0x9a {
 		pkt.is = 0
@@ -136,7 +139,7 @@ func DecodeLong32b(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func DecodeLong64b(header byte, reader *bufio.Reader) TracePacket {
-	pkt := Long64bAddrETMv4{}
+	pkt := Long64bAddrETMv4{ width: 64}
 
 	if header == 0x9d {
 		pkt.is = 0
@@ -214,7 +217,7 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 	// VMID
 	if info_byte&0x40 == 0x40 {
 		pkt.vmid_valid = true
-		vmid := make([]byte, 1) // Expanded to 4B on v4.1
+		vmid := make([]byte, 4) // Expanded to 4B on v4.1
 		count, err := reader.Read(vmid)
 
 		if err != nil || count != 1 {
@@ -246,16 +249,25 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 	return pkt
 }
 
+func (pkt Long64bAddrETMv4) Address() uint64 {
+	return pkt.address
+}
+
 func (pkt Long64bAddrETMv4) String() string {
-	return fmt.Sprintf("IS%d Address = %x", pkt.is, pkt.address)
+	return fmt.Sprintf("IS%d Address = %x (%d-bit)", pkt.is, pkt.address, pkt.width)
 }
 
 func (pkt CompressedAddrETMv4) String() string {
-	return fmt.Sprintf("IS%d Offset = %x", pkt.is, pkt.offset)
+	return fmt.Sprintf("IS%d Offset = %x (%d-bit)", pkt.is, pkt.offset, pkt.width)
 }
 
 func (pkt CompressedAddrETMv4) StringWithBase(base uint64) string {
-	return fmt.Sprintf("IS%d Address = %x", pkt.is, base+uint64(pkt.offset))
+	addr := ((base >> pkt.width) << pkt.width) | pkt.offset
+	return fmt.Sprintf("IS%d Address = %016x", pkt.is, addr)
+}
+
+func (pkt CompressedAddrETMv4) AddrWithBase(base uint64) uint64 {
+	return ((base >> pkt.width) << pkt.width) | pkt.offset
 }
 
 func (pkt ExactAddrETMv4) String() string {
