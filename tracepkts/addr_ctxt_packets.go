@@ -214,7 +214,7 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 	// VMID
 	if info_byte&0x40 == 0x40 {
 		pkt.vmid_valid = true
-		vmid := make([]byte, 1) // Expanded to 4B on v4.1
+		vmid := make([]byte, 4) // Expanded to 4B on v4.1
 		count, err := reader.Read(vmid)
 
 		if err != nil || count != 1 {

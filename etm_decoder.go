@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	etf "github.com/nickjones/etm/etf"
 	pkts "github.com/nickjones/etm/tracepkts"
 )
