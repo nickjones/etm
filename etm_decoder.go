@@ -36,7 +36,6 @@ type ETMv4AddressStack struct {
 	entries []ETMv4AddressStackElement
 }
 
-
 func main() {
 
 	flag.Usage = func() {
@@ -151,21 +150,21 @@ func main() {
 			case pkts.Long64bAddrETMv4:
 				addr_pkt := pkt.(pkts.Long64bAddrETMv4)
 				addr_stack.Push(addr_pkt.Address(), addr_pkt.IS())
-				log.Println(pkt.String())
+				fmt.Println(pkt.String())
 
 			case pkts.CompressedAddrETMv4:
 				addr_pkt := pkt.(pkts.CompressedAddrETMv4)
 				addr_base_elm := addr_stack.Get(0)
 				addr := addr_pkt.AddrWithBase(addr_base_elm.address)
 				addr_stack.Push(addr, addr_pkt.IS())
-				log.Printf("IS%d Address = 0x%016x (Compressed %d-bit)\n", addr_pkt.IS(), addr, addr_pkt.Width())
+				fmt.Printf("IS%d Address = 0x%016x (Compressed %d-bit)\n", addr_pkt.IS(), addr, addr_pkt.Width())
 
 			case pkts.ExactAddrETMv4:
 				exact_pkt := pkt.(pkts.ExactAddrETMv4)
 				entry_num := exact_pkt.Entry()
 				stack_elm := addr_stack.Get(entry_num)
 				addr_stack.Push(stack_elm.address, stack_elm.is)
-				log.Printf("IS%d Address = 0x%016x (Exact Match)\n", stack_elm.is, stack_elm.address)
+				fmt.Printf("IS%d Address = 0x%016x (Exact Match)\n", stack_elm.is, stack_elm.address)
 
 			}
 		} else {
