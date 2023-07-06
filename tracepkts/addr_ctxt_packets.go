@@ -3,9 +3,9 @@ package tracepkts
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
-	"errors"
 )
 
 type Long64bAddrETMv4 struct {
@@ -25,15 +25,6 @@ type CompressedAddrETMv4 struct {
 const (
 	ADDR_COMP_STK_DEPTH = 3
 )
-
-type ETMv4AddressStackElement struct {
-	address uint64
-	is uint8
-}
-
-type ETMv4AddressStack struct {
-	entries []ETMv4AddressStackElement
-}
 
 type ExactAddrETMv4 struct {
 	*GenericTracePacketv4
@@ -71,7 +62,7 @@ func DecodeExactAddr(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func DecodeShortAddr(header byte, reader *bufio.Reader) TracePacket {
-	pkt := CompressedAddrETMv4{ width: 8}
+	pkt := CompressedAddrETMv4{width: 8}
 
 	if header == 0x95 {
 		pkt.is = 0
@@ -106,7 +97,7 @@ func DecodeShortAddr(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func DecodeLong32b(header byte, reader *bufio.Reader) TracePacket {
-	pkt := CompressedAddrETMv4{ width: 32}
+	pkt := CompressedAddrETMv4{width: 32}
 
 	if header == 0x9a {
 		pkt.is = 0
@@ -149,7 +140,7 @@ func DecodeLong32b(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func DecodeLong64b(header byte, reader *bufio.Reader) TracePacket {
-	pkt := Long64bAddrETMv4{ width: 64}
+	pkt := Long64bAddrETMv4{width: 64}
 
 	if header == 0x9d {
 		pkt.is = 0
@@ -276,12 +267,12 @@ func (pkt CompressedAddrETMv4) String() string {
 }
 
 func (pkt CompressedAddrETMv4) StringWithBase(base uint64) string {
-	addr := ((base >> uint64(pkt.width)) << uint64(pkt.width)) | pkt.offset
+	addr := pkt.AddrWithBase(base)
 	return fmt.Sprintf("IS%d Address = %016x", pkt.is, addr)
 }
 
 func (pkt CompressedAddrETMv4) AddrWithBase(base uint64) uint64 {
-	return ((base >> pkt.width) << pkt.width) | pkt.offset
+	return ((base >> uint64(pkt.width)) << uint64(pkt.width)) | pkt.offset
 }
 
 func (pkt CompressedAddrETMv4) IS() uint8 {
@@ -306,17 +297,13 @@ func (pkt ExactAddrETMv4) String() string {
 	return buffer.String()
 }
 
-// func (pkt ExactAddrETMv4) Address(stack []uint64) (uint64, error) {
-func (pkt ExactAddrETMv4) Address(stack ETMv4AddressStack) (ETMv4AddressStackElement, error) {
-	for i := 0; i < ADDR_COMP_STK_DEPTH; i++ {
+func (pkt ExactAddrETMv4) Entry() (uint8, error) {
+	for i := uint8(0); i < ADDR_COMP_STK_DEPTH; i++ {
 		if pkt.exact_match[i] {
-			if len(stack.entries) > i {
-				return ETMv4AddressStackElement{}, errors.New("Stack match in trace but no corresponding entry in trace analyzer stack! Out of bounds reference.")
-			}
-			return stack.entries[i], nil
+			return i, nil
 		}
 	}
-	return ETMv4AddressStackElement{}, errors.New("Exact match packet but all bits were false?")
+	return 3, errors.New("Exact match packet but all bits were false?")
 }
 
 func (pkt ContextETMv4) String() string {
@@ -337,16 +324,4 @@ func (pkt ContextETMv4) String() string {
 	}
 
 	return buffer.String()
-}
-
-func (s ETMv4AddressStack) Push(rhs_address uint64, rhs_is uint8) {
-	s.entries = append(s.entries, ETMv4AddressStackElement{address: rhs_address, is: rhs_is})
-	s.Compact()
-}
-
-func (s ETMv4AddressStack) Compact() {
-	// Drop oldest address, trace analyzer is required to keep a certain depth
-	if len(s.entries) > ADDR_COMP_STK_DEPTH {
-		s.entries = s.entries[:len(s.entries)-1]
-	}
 }
