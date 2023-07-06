@@ -3,7 +3,6 @@ package tracepkts
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"log"
 )
@@ -53,11 +52,8 @@ type ContextETMv4 struct {
 func DecodeExactAddr(header byte, reader *bufio.Reader) TracePacket {
 	pkt := ExactAddrETMv4{}
 
-	for i := 0; i < ADDR_COMP_STK_DEPTH; i++ {
-		if (header>>uint(i))&0x1 == 0x1 {
-			pkt.exact_match[i] = true
-		}
-	}
+	entry := uint(header&0x03)
+	pkt.exact_match[entry] = true
 	return pkt
 }
 
@@ -297,13 +293,14 @@ func (pkt ExactAddrETMv4) String() string {
 	return buffer.String()
 }
 
-func (pkt ExactAddrETMv4) Entry() (uint8, error) {
+func (pkt ExactAddrETMv4) Entry() uint8 {
 	for i := uint8(0); i < ADDR_COMP_STK_DEPTH; i++ {
 		if pkt.exact_match[i] {
-			return i, nil
+			return i
 		}
 	}
-	return 3, errors.New("Exact match packet but all bits were false?")
+	// 0b00 encoding is entry 0
+	return 0
 }
 
 func (pkt ContextETMv4) String() string {

@@ -162,10 +162,7 @@ func main() {
 
 			case pkts.ExactAddrETMv4:
 				exact_pkt := pkt.(pkts.ExactAddrETMv4)
-				entry_num, err := exact_pkt.Entry()
-				if err != nil {
-					log.Printf("WARN: failed parsing Exact Address Packet: %#v\n", err)
-				}
+				entry_num := exact_pkt.Entry()
 				stack_elm := addr_stack.Get(entry_num)
 				addr_stack.Push(stack_elm.address, stack_elm.is)
 				log.Printf("IS%d Address = 0x%016x (Exact Match)\n", stack_elm.is, stack_elm.address)
@@ -177,9 +174,9 @@ func main() {
 	}
 }
 
-func (s *ETMv4AddressStack) Push(rhs_address uint64, rhs_is uint8) {
-	log.Debugf("Pushing addr=0x%016x is=%d\n", rhs_address, rhs_is)
-	s.entries = append(s.entries, ETMv4AddressStackElement{address: rhs_address, is: rhs_is})
+func (s *ETMv4AddressStack) Push(address uint64, is uint8) {
+	log.Debugf("Pushing addr=0x%016x is=%d\n", address, is)
+	s.entries = append([]ETMv4AddressStackElement{{address, is}}, s.entries...)
 	for i, e := range s.entries {
 		log.Debugf("Addr Stack %d: %#v\n", i, e)
 	}
@@ -194,7 +191,7 @@ func (s *ETMv4AddressStack) Compact() {
 }
 
 func (s ETMv4AddressStack) Get(idx uint8) ETMv4AddressStackElement {
-	if len(s.entries) < int(idx) {
+	if len(s.entries) <= int(idx) {
 		log.Printf("WARN: Address stack match with missing entry!")
 		return ETMv4AddressStackElement{}
 	}
