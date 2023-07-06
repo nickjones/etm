@@ -27,6 +27,15 @@ var (
 	keepTmp       = flag.Bool("keeptmpbin", false, "Keep temporary ETF->ETM file.")
 )
 
+type ETMv4AddressStackElement struct {
+	address uint64
+	is uint8
+}
+
+type ETMv4AddressStack struct {
+	entries []ETMv4AddressStackElement
+}
+
 func main() {
 
 	flag.Usage = func() {
@@ -122,6 +131,7 @@ func main() {
 	}
 	input := bufio.NewReader(file)
 
+	// var addr_stack ETMv4AddressStack
 	var addr_stack []uint64
 
 	for {
@@ -136,22 +146,41 @@ func main() {
 		if pkt != nil {
 			switch pkt.(type) {
 			default:
-				fmt.Println(pkt.String())
+				log.Println(pkt.String())
 			case pkts.Long64bAddrETMv4:
 				addr_pkt := pkt.(pkts.Long64bAddrETMv4)
 				addr_stack = append(addr_stack, addr_pkt.Address())
-				fmt.Println(pkt.String())
+				log.Println(pkt.String())
 			case pkts.CompressedAddrETMv4:
 				addr_pkt := pkt.(pkts.CompressedAddrETMv4)
 				addr := uint64(0)
 				if len(addr_stack) > 0 {
 					addr = addr_stack[0]
 				}
-				fmt.Printf("Address: 0x%016x\n", addr_pkt.AddrWithBase(addr))
-				// fmt.Println(addr_pkt.StringWithBase(addr))
+				addr = addr_pkt.AddrWithBase(addr)
+				addr_stack = append(addr_stack, addr)
+				log.Printf("IS%d Address = 0x%016x (Compressed %d-bit)\n", addr_pkt.IS(), addr, addr_pkt.Width())
+			case pkts.ExactAddrETMv4:
+				exact_pkt := pkt.(pkts.ExactAddrETMv4)
+				addr, _ := exact_pkt.Address(addr_stack)
+				addr_stack = append(addr_stack, addr)
+				log.Printf("IS?? Address = 0x%016x (Exact Match)\n", addr)
+
 			}
 		} else {
 			log.Printf("WARN: Dropped byte 0x%x\n", header)
 		}
+	}
+}
+
+func (s ETMv4AddressStack) Push(rhs_address uint64, rhs_is uint8) {
+	s.entries = append(s.entries, ETMv4AddressStackElement{address: rhs_address, is: rhs_is})
+	s.Compact()
+}
+
+func (s ETMv4AddressStack) Compact() {
+	// Drop oldest address, trace analyzer is required to keep a certain depth
+	if len(s.entries) > pkts.ADDR_COMP_STK_DEPTH {
+		s.entries = s.entries[:len(s.entries)-1]
 	}
 }

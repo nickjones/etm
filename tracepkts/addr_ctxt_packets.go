@@ -5,20 +5,21 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"errors"
 )
 
 type Long64bAddrETMv4 struct {
 	*GenericTracePacketv4
 	is      int8
 	address uint64
-	width   uint64
+	width   uint8
 }
 
 type CompressedAddrETMv4 struct {
 	*GenericTracePacketv4
 	is     int8
 	offset uint64
-	width  uint64
+	width  uint8
 }
 
 const (
@@ -254,20 +255,28 @@ func (pkt Long64bAddrETMv4) Address() uint64 {
 }
 
 func (pkt Long64bAddrETMv4) String() string {
-	return fmt.Sprintf("IS%d Address = %x (%d-bit)", pkt.is, pkt.address, pkt.width)
+	return fmt.Sprintf("IS%d Address = 0x%016x (%d-bit)", pkt.is, pkt.address, pkt.width)
 }
 
 func (pkt CompressedAddrETMv4) String() string {
-	return fmt.Sprintf("IS%d Offset = %x (%d-bit)", pkt.is, pkt.offset, pkt.width)
+	return fmt.Sprintf("IS%d Offset = 0x%x (%d-bit)", pkt.is, pkt.offset, pkt.width)
 }
 
 func (pkt CompressedAddrETMv4) StringWithBase(base uint64) string {
-	addr := ((base >> pkt.width) << pkt.width) | pkt.offset
+	addr := ((base >> uint64(pkt.width)) << uint64(pkt.width)) | pkt.offset
 	return fmt.Sprintf("IS%d Address = %016x", pkt.is, addr)
 }
 
 func (pkt CompressedAddrETMv4) AddrWithBase(base uint64) uint64 {
 	return ((base >> pkt.width) << pkt.width) | pkt.offset
+}
+
+func (pkt CompressedAddrETMv4) IS() int8 {
+	return pkt.is
+}
+
+func (pkt CompressedAddrETMv4) Width() uint8 {
+	return pkt.width
 }
 
 func (pkt ExactAddrETMv4) String() string {
@@ -282,6 +291,18 @@ func (pkt ExactAddrETMv4) String() string {
 	}
 
 	return buffer.String()
+}
+
+func (pkt ExactAddrETMv4) Address(stack []uint64) (uint64, error) {
+	for i := 0; i < ADDR_COMP_STK_DEPTH; i++ {
+		if pkt.exact_match[i] {
+			if len(stack) > i {
+				return 0, errors.New("Stack match in trace but no corresponding entry in trace analyzer stack! Out of bounds reference.")
+			}
+			return stack[i], nil
+		}
+	}
+	return 0, errors.New("Exact match packet but all bits were false?")
 }
 
 func (pkt ContextETMv4) String() string {
