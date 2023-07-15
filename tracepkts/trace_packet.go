@@ -62,6 +62,16 @@ func DecodePacket(header byte, reader *bufio.Reader) TracePacket {
 		pkt = DecodeLong64b(header, reader)
 	case header >= 0xf6 && header <= 0xf7:
 		pkt = DecodeAtomFmt1(header, reader)
+	case header >= 0xd8 && header <= 0xdb:
+		pkt = DecodeAtomFmt2(header, reader)
+	case header >= 0xf8 && header <= 0xff:
+		pkt = DecodeAtomFmt3(header, reader)
+	case header >= 0xdc && header <= 0xdf:
+		pkt = DecodeAtomFmt4(header, reader)
+	case (header >= 0xd4 && header <= 0xd7) || header == 0xf5:
+		pkt = DecodeAtomFmt5(header, reader)
+	case header>>6 == 0x3 && (header&0x1f >= 0 || header&0x1f <= 0x14):
+		pkt = DecodeAtomFmt6(header, reader)
 	}
 	return pkt
 }

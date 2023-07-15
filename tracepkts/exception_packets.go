@@ -11,7 +11,6 @@ type ExceptionETMv4 struct {
 	e1e0        uint8
 	etype       uint16
 	p           bool
-	return_addr TracePacket
 }
 
 type ExceptionReturnETMv4 struct {
@@ -120,18 +119,6 @@ func DecodeException(header byte, reader *bufio.Reader) TracePacket {
 			pkt.p = true
 		}
 	}
-	addr_header, err := reader.ReadByte()
-
-	switch addr_header {
-	case 0x9a, 0x9b:
-		pkt.return_addr = DecodeLong32b(addr_header, reader)
-	case 0x9d, 0x9e:
-		pkt.return_addr = DecodeLong64b(addr_header, reader)
-	default:
-		pkt.return_addr = nil
-		log.Println("Error decoding header for preferred return address after exception.")
-	}
-
 	return pkt
 }
 
@@ -140,7 +127,7 @@ func DecodeExceptionReturn(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func (pkt ExceptionETMv4) String() string {
-	return fmt.Sprintf("Exception: [E1:E0]: %x Type: %s Preferred Return Address: %s", pkt.e1e0, etypes[pkt.etype], pkt.return_addr.String())
+	return fmt.Sprintf("Exception: [E1:E0]: %x Type: %s", pkt.e1e0, etypes[pkt.etype])
 }
 
 func (ExceptionReturnETMv4) String() string {

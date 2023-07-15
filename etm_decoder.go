@@ -141,11 +141,12 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		log.Debugf("Pre DecodePacket header=0x%02x\n", header)
 		pkt := pkts.DecodePacket(header, input)
 		if pkt != nil {
 			switch pkt.(type) {
 			default:
-				log.Println(pkt.String())
+				fmt.Println(pkt.String())
 
 			case pkts.Long64bAddrETMv4:
 				addr_pkt := pkt.(pkts.Long64bAddrETMv4)
