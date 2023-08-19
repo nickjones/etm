@@ -108,8 +108,8 @@ func DecodeCycleCountFmt2(header byte, reader *bufio.Reader) TracePacket {
 func DecodeCycleCountFmt3(header byte, reader *bufio.Reader) TracePacket {
 	pkt := CycleCountFmt3ETMv4{}
 
-	pkt.commit = uint32(header & 0x3)
-	pkt.cycle_count = uint32(header&0x0c) >> 2
+	pkt.cycle_count = uint32(header & 0x3)
+	pkt.commit = uint32(header&0x0c) >> 2
 
 	return pkt
 }

@@ -217,7 +217,7 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 		vmid := make([]byte, 4) // Expanded to 4B on v4.1
 		count, err := reader.Read(vmid)
 
-		if err != nil || count != 1 {
+		if err != nil || count != 4 {
 			log.Println("Error reading VMID byte for Context.")
 		}
 
@@ -231,12 +231,21 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 	// CONTEXTID
 	if info_byte&0x80 == 0x80 {
 		pkt.cid_valid = true
-		cid := make([]byte, 4)
-		count, err := reader.Read(cid)
+		var cid []byte
 
-		if err != nil || count != 4 {
-			log.Println("Error reading CONTEXTID bytes for Context.")
+		for i := 0; i < 4; i++ {
+			cids, err := reader.Read(cid)
+			if err != nil {
+				log.Println("Error reading CONTEXTID bytes for Context.")
+			} else {
+				cid = append(cid, cids)
+			}
 		}
+
+		fi len(cid) != 4 {
+			log.Println("Error: Read CONTEXTID bytes was less than expected 4 bytes.")
+		}
+
 
 		for k, v := range cid {
 			pkt.cid |= uint32(v) << uint(8*k)
