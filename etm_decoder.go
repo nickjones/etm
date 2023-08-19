@@ -27,6 +27,15 @@ var (
 	keepTmp       = flag.Bool("keeptmpbin", false, "Keep temporary ETF->ETM file.")
 )
 
+type ETMv4AddressStackElement struct {
+	address uint64
+	is      uint8
+}
+
+type ETMv4AddressStack struct {
+	entries []ETMv4AddressStackElement
+}
+
 func main() {
 
 	flag.Usage = func() {
@@ -122,6 +131,8 @@ func main() {
 	}
 	input := bufio.NewReader(file)
 
+	var addr_stack ETMv4AddressStack
+
 	for {
 		header, err := input.ReadByte()
 		if err == io.EOF {
@@ -130,11 +141,59 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		log.Debugf("Pre DecodePacket header=0x%02x\n", header)
 		pkt := pkts.DecodePacket(header, input)
 		if pkt != nil {
-			fmt.Println(pkt.String())
+			switch pkt.(type) {
+			default:
+				fmt.Println(pkt.String())
+
+			case pkts.Long64bAddrETMv4:
+				addr_pkt := pkt.(pkts.Long64bAddrETMv4)
+				addr_stack.Push(addr_pkt.Address(), addr_pkt.IS())
+				fmt.Println(pkt.String())
+
+			case pkts.CompressedAddrETMv4:
+				addr_pkt := pkt.(pkts.CompressedAddrETMv4)
+				addr_base_elm := addr_stack.Get(0)
+				addr := addr_pkt.AddrWithBase(addr_base_elm.address)
+				addr_stack.Push(addr, addr_pkt.IS())
+				fmt.Printf("IS%d Address = 0x%016x (Compressed %d-bit)\n", addr_pkt.IS(), addr, addr_pkt.Width())
+
+			case pkts.ExactAddrETMv4:
+				exact_pkt := pkt.(pkts.ExactAddrETMv4)
+				entry_num := exact_pkt.Entry()
+				stack_elm := addr_stack.Get(entry_num)
+				addr_stack.Push(stack_elm.address, stack_elm.is)
+				fmt.Printf("IS%d Address = 0x%016x (Exact Match)\n", stack_elm.is, stack_elm.address)
+
+			}
 		} else {
 			log.Printf("WARN: Dropped byte 0x%x\n", header)
 		}
 	}
+}
+
+func (s *ETMv4AddressStack) Push(address uint64, is uint8) {
+	log.Debugf("Pushing addr=0x%016x is=%d\n", address, is)
+	s.entries = append([]ETMv4AddressStackElement{{address, is}}, s.entries...)
+	for i, e := range s.entries {
+		log.Debugf("Addr Stack %d: %#v\n", i, e)
+	}
+	s.Compact()
+}
+
+func (s *ETMv4AddressStack) Compact() {
+	// Drop oldest address, trace analyzer is required to keep a certain depth
+	if len(s.entries) > pkts.ADDR_COMP_STK_DEPTH {
+		s.entries = s.entries[:len(s.entries)-1]
+	}
+}
+
+func (s ETMv4AddressStack) Get(idx uint8) ETMv4AddressStackElement {
+	if len(s.entries) <= int(idx) {
+		log.Printf("WARN: Address stack match with missing entry!")
+		return ETMv4AddressStackElement{}
+	}
+	return s.entries[idx]
 }

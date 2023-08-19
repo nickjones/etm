@@ -9,14 +9,16 @@ import (
 
 type Long64bAddrETMv4 struct {
 	*GenericTracePacketv4
-	is      int8
+	is      uint8
 	address uint64
+	width   uint8
 }
 
 type CompressedAddrETMv4 struct {
 	*GenericTracePacketv4
-	is     int8
+	is     uint8
 	offset uint64
+	width  uint8
 }
 
 const (
@@ -50,16 +52,13 @@ type ContextETMv4 struct {
 func DecodeExactAddr(header byte, reader *bufio.Reader) TracePacket {
 	pkt := ExactAddrETMv4{}
 
-	for i := 0; i < ADDR_COMP_STK_DEPTH; i++ {
-		if (header>>uint(i))&0x1 == 0x1 {
-			pkt.exact_match[i] = true
-		}
-	}
+	entry := uint(header&0x03)
+	pkt.exact_match[entry] = true
 	return pkt
 }
 
 func DecodeShortAddr(header byte, reader *bufio.Reader) TracePacket {
-	pkt := CompressedAddrETMv4{}
+	pkt := CompressedAddrETMv4{width: 8}
 
 	if header == 0x95 {
 		pkt.is = 0
@@ -87,13 +86,14 @@ func DecodeShortAddr(header byte, reader *bufio.Reader) TracePacket {
 			addr_int &= 0x7f
 		}
 		pkt.offset |= addr_int << uint(9-pkt.is)
+		pkt.width = 16
 	}
 
 	return pkt
 }
 
 func DecodeLong32b(header byte, reader *bufio.Reader) TracePacket {
-	pkt := CompressedAddrETMv4{}
+	pkt := CompressedAddrETMv4{width: 32}
 
 	if header == 0x9a {
 		pkt.is = 0
@@ -136,7 +136,7 @@ func DecodeLong32b(header byte, reader *bufio.Reader) TracePacket {
 }
 
 func DecodeLong64b(header byte, reader *bufio.Reader) TracePacket {
-	pkt := Long64bAddrETMv4{}
+	pkt := Long64bAddrETMv4{width: 64}
 
 	if header == 0x9d {
 		pkt.is = 0
@@ -217,7 +217,7 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 		vmid := make([]byte, 4) // Expanded to 4B on v4.1
 		count, err := reader.Read(vmid)
 
-		if err != nil || count != 1 {
+		if err != nil || count != 4 {
 			log.Println("Error reading VMID byte for Context.")
 		}
 
@@ -231,12 +231,21 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 	// CONTEXTID
 	if info_byte&0x80 == 0x80 {
 		pkt.cid_valid = true
-		cid := make([]byte, 4)
-		count, err := reader.Read(cid)
+		var cid []byte
 
-		if err != nil || count != 4 {
-			log.Println("Error reading CONTEXTID bytes for Context.")
+		for i := 0; i < 4; i++ {
+			cids, err := reader.Read(cid)
+			if err != nil {
+				log.Println("Error reading CONTEXTID bytes for Context.")
+			} else {
+				cid = append(cid, cids)
+			}
 		}
+
+		fi len(cid) != 4 {
+			log.Println("Error: Read CONTEXTID bytes was less than expected 4 bytes.")
+		}
+
 
 		for k, v := range cid {
 			pkt.cid |= uint32(v) << uint(8*k)
@@ -246,16 +255,37 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 	return pkt
 }
 
+func (pkt Long64bAddrETMv4) Address() uint64 {
+	return pkt.address
+}
+
+func (pkt Long64bAddrETMv4) IS() uint8 {
+	return pkt.is
+}
+
 func (pkt Long64bAddrETMv4) String() string {
-	return fmt.Sprintf("IS%d Address = %x", pkt.is, pkt.address)
+	return fmt.Sprintf("IS%d Address = 0x%016x (%d-bit)", pkt.is, pkt.address, pkt.width)
 }
 
 func (pkt CompressedAddrETMv4) String() string {
-	return fmt.Sprintf("IS%d Offset = %x", pkt.is, pkt.offset)
+	return fmt.Sprintf("IS%d Offset = 0x%x (%d-bit)", pkt.is, pkt.offset, pkt.width)
 }
 
 func (pkt CompressedAddrETMv4) StringWithBase(base uint64) string {
-	return fmt.Sprintf("IS%d Address = %x", pkt.is, base+uint64(pkt.offset))
+	addr := pkt.AddrWithBase(base)
+	return fmt.Sprintf("IS%d Address = %016x", pkt.is, addr)
+}
+
+func (pkt CompressedAddrETMv4) AddrWithBase(base uint64) uint64 {
+	return ((base >> uint64(pkt.width)) << uint64(pkt.width)) | pkt.offset
+}
+
+func (pkt CompressedAddrETMv4) IS() uint8 {
+	return pkt.is
+}
+
+func (pkt CompressedAddrETMv4) Width() uint8 {
+	return pkt.width
 }
 
 func (pkt ExactAddrETMv4) String() string {
@@ -270,6 +300,16 @@ func (pkt ExactAddrETMv4) String() string {
 	}
 
 	return buffer.String()
+}
+
+func (pkt ExactAddrETMv4) Entry() uint8 {
+	for i := uint8(0); i < ADDR_COMP_STK_DEPTH; i++ {
+		if pkt.exact_match[i] {
+			return i
+		}
+	}
+	// 0b00 encoding is entry 0
+	return 0
 }
 
 func (pkt ContextETMv4) String() string {
