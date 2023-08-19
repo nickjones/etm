@@ -234,7 +234,7 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 		var cid []byte
 
 		for i := 0; i < 4; i++ {
-			cids, err := reader.Read(cid)
+			cids, err := reader.ReadByte()
 			if err != nil {
 				log.Println("Error reading CONTEXTID bytes for Context.")
 			} else {
@@ -242,7 +242,7 @@ func DecodeContext(header byte, reader *bufio.Reader) TracePacket {
 			}
 		}
 
-		fi len(cid) != 4 {
+		if len(cid) != 4 {
 			log.Println("Error: Read CONTEXTID bytes was less than expected 4 bytes.")
 		}
 
